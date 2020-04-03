@@ -23,6 +23,8 @@ app = Flask(__name__)
 
 def map_corona(df_corona_m):
 
+    global m
+
     m = folium.Map(location=[34.88835, 33.40835], zoom_start=2,\
                 tiles="cartodbdark_matter")
 
@@ -71,7 +73,7 @@ def map_corona(df_corona_m):
         ).add_to(m)
 
 
-    m.save('templates/corona_virus.html')
+    #m.save('templates/corona_virus.html')
 
 
 
@@ -84,16 +86,19 @@ def retrieve_info():
 
     soup = BeautifulSoup(page.content, 'html.parser')
 
-    table = soup.find('table',class_="table table-bordered table-hover")
+    table = soup.find('table',{'class':re.compile(r'table table-bordered table-hover')})
     countries = table.find_all('td',style="font-weight: bold; font-size:15px; text-align:left;")
     total_cases = table.findAll('td',style="font-weight: bold; text-align:right")
     new_cases = table.findAll('td',style="font-weight: normal; text-align:right;background-color:#FFEEAA;")
 
-    total_deaths = table.findAll('td', style = "font-weight: bold; text-align:right;")
+    #total_deaths = table.findAll('td', style = "font-weight: bold; text-align:right;")
+
+    total_deaths = table.findAll('td', style=re.compile(r'font-weight: bold; text-align:right;'))
+    total_deaths = total_deaths[1::3]
 
     df = []
 
-    total_cases_chunks = list(zip(*[iter(total_cases)]*4))
+    total_cases_chunks = list(zip(*[iter(total_cases)]*5))
 
     for i in range(len(countries)):
 
@@ -132,6 +137,10 @@ def retrieve_info():
 
     df_corona_m = df_corona_m.fillna(0)
 
+    df_corona_m['Total cases'] = df_corona_m['Total cases'].astype(int)
+    df_corona_m.sort_values(by=['Total cases'], ascending=False, inplace = True)
+    df_corona_m.reset_index(drop=True, inplace=True)
+
 
     map_corona(df_corona_m)
 
@@ -145,15 +154,17 @@ def index():
     df_corona_m = retrieve_info()
 
 
-    df_corona_m = df_corona_m.iloc[:, 0:5]
+    df_corona_m_r = df_corona_m.iloc[:, 0:5]
     # Connecting to a template (html file)
-    return render_template('index.html',  tables=[df_corona_m.to_html()], titles = ['na','General info'])
+    return render_template('index.html',  tables=[df_corona_m_r.to_html()], titles = ['na','General info'])
 
 
 @app.route('/get_map')
 def get_map():
-    return render_template('corona_virus.html')
+
+    return m._repr_html_()
+    #return render_template('corona_virus.html')
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
